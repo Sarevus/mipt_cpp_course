@@ -1,12 +1,11 @@
 #include "rules.h"
 
-#include <cstddef>
 #include <print>
-
-#include "event.h"
 
 namespace nano_edr {
 
+// "?" вместо исключения: такое значение бывает только из битого каста,
+// и ронять из-за него прогон незачем.
 const char* SeverityName(Severity severity) {
     switch (severity) {
         case Severity::kLow:
@@ -21,6 +20,7 @@ const char* SeverityName(Severity severity) {
     return "?";
 }
 
+// Исключения из правил не ловим — их ловит main.
 size_t CheckRules(const Event& event, const Rule* rules, size_t rule_count) {
     size_t detects = 0;
     for (size_t i = 0; i < rule_count; ++i) {

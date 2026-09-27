@@ -1,10 +1,5 @@
 #include "parse.h"
 
-#include <cstddef>
-#include <string>
-
-#include "event.h"
-
 namespace nano_edr {
 
 namespace {
@@ -50,6 +45,9 @@ bool IsBlankOrComment(const std::string* line) {
     return true;
 }
 
+// false, а не исключение: битая строка в журнале — обычное дело, и прогон
+// из-за неё не останавливается. Для пустой строки и комментария *out
+// не трогаем.
 bool ParseEventLine(const std::string* line, Event* out) {
     if (IsBlankOrComment(line)) {
         return false;
@@ -79,6 +77,7 @@ bool ParseEventLine(const std::string* line, Event* out) {
         ++i;
 
         std::string value;
+        // Экранирования нет: в путях Windows обратный слеш на каждом шагу.
         if (i < size && (*line)[i] == '"') {
             const std::size_t close = line->find('"', i + 1);
             if (close == std::string::npos) {

@@ -1,9 +1,8 @@
 #include "event_list.h"
 
-#include "event.h"
-
 namespace nano_edr {
 
+// Узлы вернутся на любом выходе из области видимости, и при исключении тоже.
 EventList::~EventList() {
     ListClear(this);
 }
@@ -13,7 +12,7 @@ void ListPushBack(EventList* list, const Event* event) {
         ListPopFront(list);
     }
 
-    EventNode* node = new EventNode{*event, nullptr};
+    auto* node = new EventNode{*event, nullptr};
     if (list->tail == nullptr) {
         list->head = node;
     } else {
@@ -23,6 +22,7 @@ void ListPushBack(EventList* list, const Event* event) {
     ++list->size;
 }
 
+// Пустой список — не ошибка, просто нечего убирать.
 void ListPopFront(EventList* list) {
     if (list->head == nullptr) {
         return;
@@ -33,11 +33,13 @@ void ListPopFront(EventList* list) {
     delete old_head;
     --list->size;
 
+    // Иначе tail останется висячим.
     if (list->head == nullptr) {
         list->tail = nullptr;
     }
 }
 
+// capacity — настройка, её не сбрасываем.
 void ListClear(EventList* list) {
     while (list->head != nullptr) {
         ListPopFront(list);

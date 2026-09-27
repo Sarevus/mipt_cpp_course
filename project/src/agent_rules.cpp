@@ -1,12 +1,6 @@
 #include "agent_rules.h"
 
-#include <cstddef>
-#include <iterator>
-#include <string>
-
-#include "event.h"
 #include "fields.h"
-#include "rules.h"
 
 namespace nano_edr {
 
@@ -24,18 +18,19 @@ bool EndsWith(const std::string& text, const std::string& suffix) {
            0;
 }
 
-// Сравнивается имя файла образа, а не подстрока: cmd.exe со словом wscript
-// в командной строке скриптовым хостом не становится.
+// Сравниваем имя файла, а не подстроку: cmd.exe со словом wscript
+// в командной строке — не скриптовый хост.
 bool ImageIs(const std::string& image, const std::string& name) {
     return image == name || EndsWith(image, "\\" + name);
 }
 
-// Образ обязателен: process_start без image бросает из GetRequiredField.
+// image обязателен: без него правило про образ не проверить, поэтому
+// исключение из GetRequiredField, а не тихий false.
 std::string ProcessImage(const Event& event) {
     return NormalizePath(GetRequiredField(event, "image"));
 }
 
-// false, если командной строки нет: проверять правилу нечего.
+// Без cmdline процесс законен, просто проверять нечего — отсюда false.
 bool NormalizedCommandLine(const Event& event, std::string& out) {
     const std::string* cmdline = FindField(event, "cmdline");
     if (cmdline == nullptr) {
@@ -58,6 +53,7 @@ const std::string* TargetPath(const Event& event) {
     return FindField(event, "path");
 }
 
+// wscript законно запускают и из C:\corp\tools, детект — только из Temp.
 bool ScriptHostFromTemp(const Event& event) {
     if (!IsProcessStart(event)) {
         return false;
@@ -70,10 +66,11 @@ bool ScriptHostFromTemp(const Event& event) {
     if (!NormalizedCommandLine(event, cmdline)) {
         return false;
     }
-    return Contains(cmdline, "\\appdata\\local\\temp\\") ||
-           Contains(cmdline, "\\windows\\temp\\");
+    return Contains(cmdline, R"(\appdata\local\temp\)") ||
+           Contains(cmdline, R"(\windows\temp\)");
 }
 
+// http: без слешей: после NormalizePath "//" превращается в "\".
 bool LolbinDownload(const Event& event) {
     if (!IsProcessStart(event)) {
         return false;
@@ -107,6 +104,8 @@ bool HiddenPowershell(const Event& event) {
            Contains(cmdline, "-enc") || Contains(cmdline, "-encodedcommand");
 }
 
+// Полный путь, а не просто \startup\: у Word есть свой STARTUP
+// для временных файлов, и это не автозагрузка.
 bool AutostartWrite(const Event& event) {
     if (!IsFileChange(event)) {
         return false;
@@ -115,9 +114,10 @@ bool AutostartWrite(const Event& event) {
     if (path == nullptr) {
         return false;
     }
-    return Contains(NormalizePath(*path), "\\start menu\\programs\\startup\\");
+    return Contains(NormalizePath(*path), R"(\start menu\programs\startup\)");
 }
 
+// Именно окончание: report.locked.docx — не шифровальщик.
 bool RansomExtension(const Event& event) {
     if (!IsFileChange(event)) {
         return false;
@@ -144,7 +144,7 @@ const Rule* AgentRules() {
 }
 
 size_t AgentRuleCount() {
-    return std::size(kRules);
+    return sizeof(kRules) / sizeof(kRules[0]);
 }
 
 }  // namespace nano_edr
