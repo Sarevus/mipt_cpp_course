@@ -1,58 +1,70 @@
-// Каркас агента: читает журнал событий построчно и считает строки.
-//
-// Это заготовка занятия 1.1, а не решение. Детектов она не ищет — их вы
-// добавите здесь же, в отмеченном месте ниже. Формат строки детекта, список
-// признаков и правило про их порядок заданы в постановке занятия: по ним
-// сравниваются эталоны.
-//
-// Весь код лежит в main, и на этом занятии так и надо: функции появятся
-// на занятии 1.2, ссылки — на 1.3. Разбор аргументов, коды возврата и флаг
-// --quiet — часть задания.
-//
-// Запуск:
-//   nano-edr <журнал.log>
+// Занятие 1.1: читаем журнал, считаем события по типам, печатаем детекты.
+//   nano-edr <журнал.log> [--quiet]
 #include <cstdio>
 #include <fstream>
+#include <map>
 #include <print>
 #include <string>
+#include <vector>
 
 int main(int argc, char** argv) {
-    // Аргументы разбираются грубо: путь к журналу и ничего больше. Остальное,
-    // включая --quiet, добавляется по заданию.
-    if (argc < 2) {
-        std::print(stderr, "использование: nano-edr <журнал.log>\n");
+    std::string path;
+    bool quiet = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--quiet") {
+            quiet = true;
+        } else {
+            path = arg;
+        }
+    }
+    if (path.empty()) {
+        std::print(stderr, "использование: nano-edr <журнал.log> [--quiet]\n");
         return 2;
     }
 
-    std::ifstream log(argv[1]);
+    std::ifstream log(path);
     if (!log) {
-        std::print(stderr, "не удалось открыть журнал: {}\n", argv[1]);
+        std::print(stderr, "не удалось открыть журнал: {}\n", path);
         return 2;
     }
 
-    long long lines = 0;
-    long long comments = 0;
+    // Порядок признаков — часть формата вывода, а не оформление списка.
+    const std::vector<std::string> marks = {
+        "wscript.exe", ".locked", "certutil.exe", "\\Startup\\"};
+
+    std::map<std::string, int> by_type;
+    int lines = 0;
+    int events = 0;
     std::string line;
 
     while (std::getline(log, line)) {
-        // Счётчик увеличивается до всех проверок: он считает строки файла,
-        // а не события. Номер, посчитанный по событиям, бесполезен — по нему
-        // нельзя открыть файл и посмотреть.
-        ++lines;
+        ++lines;  // считаем все строки файла, включая пустые и комментарии
 
-        // Строки-комментарии в журнале начинаются с '#'. Они не события,
-        // и детекта по ним быть не должно.
-        if (!line.empty() && line[0] == '#') {
-            ++comments;
-            continue;
+        // Комментарий может начинаться с отступа, и это всё ещё комментарий.
+        std::size_t start = line.find_first_not_of(" \t");
+        if (start == std::string::npos) continue;
+        if (line[start] == '#' || line[start] == ';') continue;
+        ++events;
+
+        std::size_t t = line.find("type=");
+        if (t != std::string::npos) {
+            t += 5;
+            ++by_type[line.substr(t, line.find(' ', t) - t)];
         }
 
-        // >>> Здесь начинается занятие 1.1.
-        //
-        // Проверка признаков и печать детекта. Номер строки, который нужен
-        // в выводе, — это lines.
+        for (const std::string& mark : marks) {
+            if (line.find(mark) != std::string::npos) {
+                std::print("[DETECT] строка {}, признак {}: {}\n",
+                           lines, mark, line);
+            }
+        }
     }
 
-    std::print("строк {}, из них комментариев {}\n", lines, comments);
-    return 0;
+    if (!quiet) {
+        std::print("\nстрок {}, событий {}\n", lines, events);
+        for (const auto& [type, count] : by_type) {
+            std::print("  {} — {}\n", type, count);
+        }
+    }
 }
