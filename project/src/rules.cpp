@@ -1,6 +1,8 @@
 #include "rules.h"
 
-#include <print>
+#include <memory>
+
+#include "detect_line.h"
 
 namespace nano_edr {
 
@@ -25,9 +27,16 @@ size_t CheckRules(const Event& event, const Rule* rules, size_t rule_count) {
     size_t detects = 0;
     for (size_t i = 0; i < rule_count; ++i) {
         if (rules[i].check(event)) {
-            std::print("[DETECT] {}  {}  ts={} pid={}\n",
-                       SeverityName(rules[i].severity), rules[i].id, event.ts,
-                       event.pid);
+            // Задание 3. Голый `DetectLine* line = new ...` сам не удалится:
+            // деструктор не вызовется, строки детекта не будет, память утечёт.
+            // 3а: хватило бы `delete line;` после `++detects;`, но исключение
+            // между new и delete этот delete перепрыгивает (3б). unique_ptr
+            // удаляет объект на любом выходе из области видимости, в том числе
+            // при раскрутке стека, а сам объект остаётся в динамической памяти.
+            std::unique_ptr<DetectLine> line = std::make_unique<DetectLine>(DetectLine{rules[i], event});
+            // std::print("[DETECT] {}  {}  ts={} pid={}\n",
+            //            SeverityName(rules[i].severity), rules[i].id, event.ts,
+            //            event.pid);
             ++detects;
         }
     }

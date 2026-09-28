@@ -105,18 +105,19 @@ void CountType(std::vector<TypeCount>& types, const std::string& type) {
     types.push_back(entry);
 }
 
-// Два последних события окна, старшее первым.
-void PrintContext(const EventList& window) {
-    const std::size_t shown = window.size < 2 ? window.size : 2;
-    const EventNode* node = window.head;
-    for (std::size_t i = shown; i < window.size; ++i) {
-        node = node->next;
+// Два последних события окна, старшее первым. Последнее — хвост окна,
+// предпоследнее вызывающий хранит копией: за ним по односвязному списку
+// пришлось бы идти от головы. Копия, а не указатель на узел, — узел может
+// уже быть удалён, когда окно полно.
+void PrintContext(const EventList& window, const Event& before_last) {
+    if (window.size >= 2) {
+        std::print("[CTX] -2: ts={} type={} pid={}\n", before_last.ts,
+                   before_last.type, before_last.pid);
     }
-
-    for (std::size_t offset = shown; node != nullptr; --offset) {
-        std::print("[CTX] -{}: ts={} type={} pid={}\n", offset,
-                   node->event.ts, node->event.type, node->event.pid);
-        node = node->next;
+    if (window.tail != nullptr) {
+        const Event& last = window.tail->event;
+        std::print("[CTX] -1: ts={} type={} pid={}\n", last.ts, last.type,
+                   last.pid);
     }
 }
 
@@ -126,6 +127,8 @@ Summary Run(std::ifstream& log, const Options& options) {
     Summary summary;
     EventList window;
     window.capacity = options.window_size;
+    // Предпоследнее событие окна; осмысленно, только пока window.size >= 2.
+    Event before_last;
 
     std::string line;
     while (std::getline(log, line)) {
@@ -151,9 +154,12 @@ Summary Run(std::ifstream& log, const Options& options) {
         // Контекст — то, что было до детекта, поэтому событие идёт в окно
         // только после печати.
         if (detects > 0 && !options.quiet) {
-            PrintContext(window);
+            PrintContext(window, before_last);
         }
 
+        if (window.tail != nullptr) {
+            before_last = window.tail->event;
+        }
         ListPushBack(&window, &event);
     }
     return summary;
