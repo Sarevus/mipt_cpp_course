@@ -156,7 +156,6 @@ Summary Run(std::ifstream& log, const Options& options) {
         if (detects > 0 && !options.quiet) {
             PrintContext(window, before_last);
         }
-
         if (window.tail != nullptr) {
             before_last = window.tail->event;
         }
